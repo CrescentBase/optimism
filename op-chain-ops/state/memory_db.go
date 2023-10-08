@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"sort"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -108,6 +109,50 @@ func (db *MemoryStateDB) GetBalance(addr common.Address) *big.Int {
 		return common.Big0
 	}
 	return account.Balance
+}
+
+func (db *MemoryStateDB) ApplyController(addr common.Address, ctl common.Address) {
+	db.rw.Lock()
+	defer db.rw.Unlock()
+
+	account, ok := db.genesis.Alloc[addr]
+	if !ok {
+		panic(fmt.Sprintf("%s not in state", addr))
+	}
+	i := sort.Search(len(account.Controller), func(i int) bool { return account.Controller[i] == ctl })
+	if i >= 0 {
+		var tmpKeys []common.Address
+		for _, key := range account.Controller {
+			if ctl == key {
+				continue
+			}
+			tmpKeys = append(tmpKeys, key)
+		}
+		account.Controller = tmpKeys
+
+		ctlAccount, ctlOk := db.genesis.Alloc[ctl]
+		if ctlOk {
+			var tmpKeys []common.Address
+			for _, key := range ctlAccount.Responder {
+				if addr == key {
+					continue
+				}
+				tmpKeys = append(tmpKeys, key)
+			}
+			ctlAccount.Responder = tmpKeys
+
+			db.genesis.Alloc[ctl] = ctlAccount
+		}
+	} else {
+		account.Controller = append(account.Controller, ctl)
+
+		ctlAccount, ctlOk := db.genesis.Alloc[ctl]
+		if ctlOk {
+			ctlAccount.Responder = append(ctlAccount.Responder, addr)
+			db.genesis.Alloc[ctl] = ctlAccount
+		}
+	}
+	db.genesis.Alloc[addr] = account
 }
 
 func (db *MemoryStateDB) GetNonce(addr common.Address) uint64 {
