@@ -51,7 +51,7 @@ var (
 	PollIntervalFlag = &cli.DurationFlag{
 		Name:    "poll-interval",
 		Usage:   "How frequently to poll L2 for new blocks",
-		Value:   6 * time.Second,
+		Value:   3 * time.Minute,
 		EnvVars: prefixEnvVars("POLL_INTERVAL"),
 	}
 	MaxPendingTransactionsFlag = &cli.Uint64Flag{
